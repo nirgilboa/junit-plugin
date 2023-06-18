@@ -25,6 +25,7 @@ package hudson.tasks.test;
 
 
 import java.util.Collection;
+import java.util.Collections;
 
 /**
  * The purpose of this class is to provide a good place for the
@@ -41,5 +42,12 @@ public abstract class MetaTabulatedResult extends TabulatedResult {
      */
     @Override
     public abstract Collection<? extends TestResult> getFailedTests();
+
+    /**
+     * All skipped tests.
+     */
+    public Collection<? extends TestResult> getSkippedTests() {
+        return Collections.emptyList();
+    }
 
 }

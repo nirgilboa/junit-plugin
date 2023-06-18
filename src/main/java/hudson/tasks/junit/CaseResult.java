@@ -100,6 +100,12 @@ public class CaseResult extends TestResult implements Comparable<CaseResult> {
      */
     private /*final*/ int failedSince;
 
+    /**
+     * This test has been skipped since this build number (not id.)
+     * If {@link #isPassed() passing}, this field is left unused to 0.
+     */
+    private int skippedSince;
+
     private static float parseTime(Element testCase) {
         String time = testCase.attributeValue("time");
         return new TimeToFloat(time).parse();
@@ -448,6 +454,17 @@ public class CaseResult extends TestResult implements Comparable<CaseResult> {
         return failedSince;
     }
 
+    /**
+     * If this test was skipped, then return the build number
+     * when this test was first skipped.
+     */
+    @Exported(visibility=9)
+    public int getSkippedSince() {
+        // If we haven't calculated skippedSince yet, and we should, do it now.
+        recomputeSkippedSinceIfNeeded();
+        return skippedSince;
+    }
+
     private void recomputeFailedSinceIfNeeded() {
         if (failedSince==0 && getFailCount()==1) {
             CaseResult prev = getPreviousResult();
@@ -458,6 +475,21 @@ public class CaseResult extends TestResult implements Comparable<CaseResult> {
             } else {
                 LOGGER.warning("trouble calculating getFailedSince. We've got prev, but no owner.");
                 // failedSince will be 0, which isn't correct. 
+            }
+        }
+    }
+
+    private void recomputeSkippedSinceIfNeeded() {
+        if (skippedSince==0 && getSkipCount()==1) {
+            CaseResult prev = getPreviousResult();
+            if(prev!=null && prev.isSkipped()){
+                this.skippedSince = prev.getSkippedSince();
+            }
+            else if (getRun() != null) {
+                this.skippedSince = getRun().getNumber();
+            } else {
+                LOGGER.warning("trouble calculating getSkippedSince. We've got prev, but no owner.");
+                // skippedSince will be 0, which isn't correct.
             }
         }
     }
@@ -474,6 +506,10 @@ public class CaseResult extends TestResult implements Comparable<CaseResult> {
         return getRun().getParent().getBuildByNumber(getFailedSince());
     }
 
+    public Run<?,?> getSkippedSinceRun() {
+        return getRun().getParent().getBuildByNumber(getSkippedSince());
+    }
+
     /**
      * Gets the number of consecutive builds (including this)
      * that this test case has been failing.
@@ -482,14 +518,16 @@ public class CaseResult extends TestResult implements Comparable<CaseResult> {
      */
     @Exported(visibility=9)
     public int getAge() {
-        if(isPassed())
+        if(isPassed()) {
             return 0;
-        else if (getRun() != null) {
-            return getRun().getNumber()-getFailedSince()+1;
+        } else if (getRun() != null && isFailed()) {
+            return getRun().getNumber() - getFailedSince() + 1;
+        } else if (getRun() != null && isSkipped()) {
+            return getRun().getNumber()-getSkippedSince()+1;
         } else {
             LOGGER.fine("Trying to get age of a CaseResult without an owner");
-            return 0; 
-    }
+            return 0;
+        }
     }
 
     /**
